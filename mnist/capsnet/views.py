@@ -16,6 +16,7 @@ def predict(request):
 
 		if serializer.is_valid():
 			serializer.save()
+			serializer.data['prediction'] = 9
 			return JsonResponse(serializer.data, status=201)
 		else:
 			return JsonResponse(serializer.data, status=400)
