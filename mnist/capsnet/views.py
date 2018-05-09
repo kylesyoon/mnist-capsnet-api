@@ -1,9 +1,13 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from rest_framework.renderers import JSONRenderer
-from rest_framework.parsers import JSONParser
-from capsnet.models import InputImage
-from capsnet.serializers import InputImageSerializer
+
+from io import BufferedWriter, FileIO
+import keras
+import numpy as np
+from skimage.io import imread
+from skimage.transform import resize
+from capsnet.capsulenet import CapsNet
+
 
 @csrf_exempt
 def predict(request):
@@ -11,16 +15,28 @@ def predict(request):
 	Get a prediction on the image put image.
 	"""
 	if request.method == 'POST':
-		data = JSONParser().parse(request)
-		serializer = InputImageSerializer(data=data)
+		# reset keras session
+		keras.backend.clear_session()
 
-		if serializer.is_valid():
-			serializer.save()
-			serializer.data['prediction'] = 9
-			return JsonResponse(serializer.data, status=201)
-		else:
-			return JsonResponse(serializer.data, status=400)
+		# get the image file
+		img = request.FILES['predict_image']
+		with BufferedWriter(FileIO('tmp.jpg', 'w')) as tmp_img:
+			for chunk in img.chunks():
+				tmp_img.write(chunk)
 
-@csrf_exempt
-def test(request):
-	return JsonResponse({'foo': 'bar'}, status=201)
+		# read file as black and white
+		img = imread('./tmp.jpg')[:,:,:1] / 255.0
+		img = np.expand_dims(img, axis=0)
+		# make sure the image shape is right
+		assert img.shape == (1, 28, 28, 1)
+
+		# load model
+		_, model, _ = CapsNet(input=(28, 28, 1), n_class=10, routings=3)
+		model.load_weights('./capsnet/trained_model.h5')
+
+		# predict
+		predictions, _ = model.predict(img, batch_size=100)
+		prediction = predictions[0]
+		prediction_number = np.argmax(prediction)
+
+		return JsonResponse({'prediction': np.asscalar(argmax)}, status=200)
