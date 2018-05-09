@@ -26,12 +26,16 @@ def predict(request):
 
 		# read file as black and white
 		img = imread('./tmp.jpg')[:,:,:1] / 255.0
+		img = resize(img, (28, 28), mode='constant', preserve_range=True)
 		img = np.expand_dims(img, axis=0)
 		# make sure the image shape is right
 		assert img.shape == (1, 28, 28, 1)
 
+		# invert image
+		img = 1 - img
+
 		# load model
-		_, model, _ = CapsNet(input=(28, 28, 1), n_class=10, routings=3)
+		_, model, _ = CapsNet(input_shape=(28, 28, 1), n_class=10, routings=3)
 		model.load_weights('./capsnet/trained_model.h5')
 
 		# predict
@@ -39,4 +43,4 @@ def predict(request):
 		prediction = predictions[0]
 		prediction_number = np.argmax(prediction)
 
-		return JsonResponse({'prediction': np.asscalar(argmax)}, status=200)
+		return JsonResponse({'prediction': np.asscalar(prediction_number)}, status=200)
